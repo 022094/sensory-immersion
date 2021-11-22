@@ -1,0 +1,579 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+setwd("D:/PhD/SensoryImmersion/Ranalysis")
+
+# Upload Packages
+library(reshape)
+library(psych)
+library(car)
+library(ez)
+library(ggplot2)
+library(MASS)
+
+# Upload data file & data wrangling
+```{r}
+SF = read.csv("CompleteSensoryData.csv", header = TRUE, sep = ",")
+
+SF <- rename(SF, c(Condition2 = "Condition", EstimateTimesWonMoreThanWagered = "EstimateWin", PANAS.SF_PositiveAffect = "PANAS_posAffect", 
+                   PANAS.SF_NegativeAffect = "PANAS_negAffect", PartA_total = "ASRS_partA", PartB_total = "ASRS_partB"))
+
+SF$Condition = as.factor(SF$Condition)
+SF$Sequence = as.factor(SF$Sequence)
+SF$Gender = as.factor(SF$Gender)
+SF$PID = as.factor(SF$PID)
+
+
+SF_final = subset(SF, select=c("PID", "Condition", "Sequence", "Age", "Gender", "EstimateWin", "DQ", "GEQ", 
+                               "Immersion_Total", "avg_immersion", "PANAS_posAffect", "PANAS_negAffect", "Depression_Total", 
+                               "Anxiety_Total", "Stress_Total", "ASRS_partA", "ASRS_partB"))
+
+SF_final$Condition=factor(SF_final$Condition, level=c("2", "3", "1"))
+
+
+SF_male = subset(SF_final, select=c("PID", "Condition", "Sequence", "Gender", "Age", "EstimateWin", "DQ", "GEQ", 
+                               "Immersion_Total", "avg_immersion", "PANAS_posAffect", "PANAS_negAffect", "Depression_Total", 
+                               "Anxiety_Total", "Stress_Total", "ASRS_partA", "ASRS_partB"), Gender == "1")
+
+SF_female = subset(SF_final, select=c("PID", "Condition", "Sequence", "Gender", "Age", "EstimateWin", "DQ", "GEQ", 
+                               "Immersion_Total", "avg_immersion", "PANAS_posAffect", "PANAS_negAffect", "Depression_Total", 
+                               "Anxiety_Total", "Stress_Total", "ASRS_partA", "ASRS_partB"), Gender == "0")
+
+SF_plus = subset(SF_final, select=c("PID", "Sequence", "Gender", "Age", "EstimateWin", "DQ", "GEQ", 
+                               "Immersion_Total", "avg_immersion", "PANAS_posAffect", "PANAS_negAffect", "Depression_Total", 
+                               "Anxiety_Total", "Stress_Total", "ASRS_partA", "ASRS_partB"), Condition == "3")
+
+SF_neutral = subset(SF_final, select=c("PID", "Sequence", "Gender", "Age", "EstimateWin", "DQ", "GEQ", 
+                               "Immersion_Total", "avg_immersion", "PANAS_posAffect", "PANAS_negAffect", "Depression_Total", 
+                               "Anxiety_Total", "Stress_Total", "ASRS_partA", "ASRS_partB"), Condition == "2")
+
+SF_minus = subset(SF_final, select=c("PID", "Sequence", "Gender", "Age", "EstimateWin", "DQ", "GEQ", 
+                               "Immersion_Total", "avg_immersion", "PANAS_posAffect", "PANAS_negAffect", "Depression_Total", 
+                               "Anxiety_Total", "Stress_Total", "ASRS_partA", "ASRS_partB"), Condition == "1")
+```
+
+# Descriptives
+```{r} 
+describe(SF_final)
+Desc = describeBy(SF_final, SF_final$Condition)
+describeBy(SF_final, SF_final$Gender)
+describeBy(SF_male, SF_male$Condition)
+describeBy(SF_female, SF_female$Condition)
+
+Desc <- do.call("rbind", Desc)
+
+write.table(Desc,"Descriptives_Jul3.csv", sep = ",", row.names = F)
+
+summary(SF_plus)
+summary(SF_minus)
+summary(SF_neutral)
+```
+
+# Checking Normality:
+```{r}
+par(mfrow=c(2,2))
+#Immersion: Total & Average:
+shapiro.test(SF_final$Immersion_Total)
+qqnorm(SF_final$Immersion_Total)
+qqline(SF_final$Immersion_Total)
+hist(SF_final$Immersion_Total, main = "Immersion", breaks = 20, xlab = "Total Immersion Score", col = "orange")
+
+shapiro.test(SF_final$avg_immersion)
+qqnorm(SF_final$avg_immersion)
+qqline(SF_final$avg_immersion)
+hist(SF_final$avg_immersion, main = "Immersion", breaks = 20, xlab = "Average Immersion Score",  col = "orange")
+
+
+#PANAS posAffect & negAffect:
+shapiro.test(SF_final$PANAS_posAffect)
+qqnorm(SF_final$PANAS_posAffect)
+qqline(SF_final$PANAS_posAffect)
+hist(SF_final$PANAS_posAffect, main = "Positive Affect on the PANAS", breaks = 30, xlab = "Total Scores",  col = "orange")
+
+shapiro.test(SF_final$PANAS_negAffect)
+qqnorm(SF_final$PANAS_negAffect)
+qqline(SF_final$PANAS_negAffect)
+hist(SF_final$PANAS_negAffect, main = "Negative Affect on the PANAS", breaks = 30, xlab = "Total Scores",  col = "orange")
+
+
+par(mfrow=c(3,2))
+
+#Depression, Anxiety, & Stress:
+shapiro.test(SF_final$Depression_Total)
+qqnorm(SF_final$Depression_Total)
+qqline(SF_final$Depression_Total)
+hist(SF_final$Depression_Total, main = "Depression Subscale on the DASS", breaks = 30, xlab = "Total Scores",  col = "orange")
+
+shapiro.test(SF_final$Anxiety_Total)
+qqnorm(SF_final$Anxiety_Total)
+qqline(SF_final$Anxiety_Total)
+hist(SF_final$Anxiety_Total, main = "Anxiety Subscale on the DASS", breaks = 30, xlab = "Total Scores",  col = "orange")
+
+shapiro.test(SF_final$Stress_Total)
+qqnorm(SF_final$Stress_Total)
+qqline(SF_final$Stress_Total)
+hist(SF_final$Stress_Total, main = "Stress Subscale on the DASS", breaks = 30, xlab = "Total Scores",  col = "orange")
+
+
+par(mfrow=c(2,2)) 
+
+#ASRS Part A & Part B:
+shapiro.test(SF_final$ASRS_partA)
+qqnorm(SF_final$ASRS_partA)
+qqline(SF_final$ASRS_partA)
+hist(SF_final$PANAS_posAffect, main = "ADHD Self-report Scale: Part A", breaks = 30, xlab = "Total Scores",  col = "orange")
+
+shapiro.test(SF_final$ASRS_partB)
+qqnorm(SF_final$ASRS_partB)
+qqline(SF_final$ASRS_partB)
+hist(SF_final$ASRS_partB, main = "ADHD Self-report Scale: Part B", breaks = 30, xlab = "Total Scores",  col = "orange")
+```
+
+
+# Data Visualization by Condition (collapsed across Gender):
+```{r}
+# Total Immersion Score
+
+Gender_cat <- c("0" = "Female", "1" = "Male")
+SF_cat <- c("1" = "Minus", "2" = "Neutral", "3" = "Plus")
+Gender_cols <- c("0" = "Blue", "1" = "DarkGreen")
+SF_cols <- c("1" = "darkcyan", "2" = "Purple", "3" = "Red")
+
+ggplot(data = SF_final, aes(x=Condition, y=Immersion_Total, colour = Condition, fill = Condition)) + 
+  geom_boxplot(stat = "boxplot", width = 0.5, position = position_dodge(0.80), alpha=0.50) +
+  geom_dotplot(binaxis = "y", stackdir = "center", dotsize = 0.50, fill = "white",position = position_dodge(0.8), binwidth = 1) + 
+  scale_y_continuous(name = "Total Immersion Score", lim = c(0, 30), breaks = seq(0, 30, 5)) + 
+  scale_x_discrete(name = "Sensory Feedback",labels = SF_cat) + 
+  labs(title="Total Immersion scores across Sensory Feedback") + theme_minimal()  + 
+  theme(plot.title = element_text(face =  "bold", size = 14, hjust = 0.5), axis.title.x = element_text(face = "bold", vjust = 0.5), 
+        axis.title.y = element_text(face = "bold", hjust = 0.5),
+        axis.text = element_text(colour = "black")) +
+  scale_color_manual(name="Sensory Feedback", aesthetics = c("colour", "fill"), labels = SF_cat, values = SF_cols) 
+
+#Average Immersion
+
+Gender_cat <- c("0" = "Female", "1" = "Male")
+SF_cat <- c("1" = "Minus", "2" = "Neutral", "3" = "Plus")
+Gender_cols <- c("0" = "Blue", "1" = "DarkGreen")
+SF_cols <- c("1" = "darkcyan", "2" = "Purple", "3" = "Red")
+
+ggplot(data = SF_final, aes(x=Condition, y=avg_immersion, colour = Condition, fill = Condition)) + 
+  geom_boxplot(stat = "boxplot", width = 0.50, position = position_dodge(0.80), alpha=0.50) +
+  geom_dotplot(binaxis = "y", stackdir = "center", dotsize = 0.50, fill = "white", position = position_dodge(0.8), binwidth = 0.19) + 
+  scale_y_continuous(name = "Average Total Immersion Score", lim = c(0, 4.5), breaks = seq(0, 4.5, 1)) + 
+  scale_x_discrete(name = "Sensory Feedback",labels = SF_cat) + 
+  labs(title="Average Immersion Scores across Sensory Feedback") + theme_minimal()  + 
+  theme(plot.title = element_text(face =  "bold", size = 14, hjust = 0.5), axis.title.x = element_text(face = "bold", vjust = 0.5), 
+        axis.title.y = element_text(face = "bold", hjust = 0.5),
+        axis.text = element_text(colour = "black"), legend.position = "none") +
+  scale_color_manual(aesthetics = c("colour", "fill"), labels = SF_cat, values = SF_cols) +
+  ggsave("avg_immersion.png", plot = last_plot(), device = NULL, path = NULL, scale = 1,width = NA, height = NA,
+  dpi = 300,
+  limitsize = TRUE)
+
+```
+
+
+# Data Visualization by Condition and Gender: 
+```{r}
+# Immersion:
+
+Gender_cat <- c("0" = "Female", "1" = "Male")
+SF_cat <- c("1" = "Minus", "2" = "Neutral", "3" = "Plus")
+Gender_cols <- c("0" = "Blue", "1" = "DarkGreen")
+
+ggplot(data = SF_final, aes(x=Condition, y=Immersion_Total, colour = Gender, fill = Gender)) + 
+  geom_boxplot(stat = "boxplot", width = 0.5, position = position_dodge(0.80), varwidth = FALSE, alpha=0.5) +
+  geom_dotplot(binaxis = "y", stackdir = "center", dotsize = 0.50, fill = "white",
+               position = position_dodge(0.8), binwidth = 1) + 
+  scale_y_continuous(name = "Total Immersion Score", lim = c(0, 30), breaks = seq(0, 30, 5)) + 
+  scale_x_discrete(name = "Sensory Feedback",labels = SF_cat) + 
+  labs(title="Total Immersion scores across Sensory Feedback") + 
+  facet_grid(.~Gender, scales = "free", labeller = labeller(Gender = Gender_cat)) + theme_minimal()  + 
+  theme(plot.title = element_text(face =  "bold", size = 14, hjust = 0.5), axis.title.x = element_text(face = "bold", vjust = 0.5), 
+        axis.title.y = element_text(face = "bold", hjust = 0.5),
+        axis.text = element_text(colour = "black"), legend.position = "none") +
+  scale_color_manual(name="Gender", aesthetics = c("colour", "fill"), labels = Gender_cat, values = Gender_cols) 
+
+
+# Average Immersion Faceted Across Sensory Conditions :
+
+Gender_cat <- c("0" = "Female", "1" = "Male")
+SF_cat <- c("1" = "Minus", "2" = "Neutral", "3" = "Plus")
+SF_cols <- c("1" = "darkcyan", "2" = "Purple", "3" = "Red")
+
+ggplot(data = SF_final, aes(x=Gender, y=avg_immersion, color = Condition, fill = Condition)) + 
+  geom_boxplot(stat = "boxplot", width = 0.5, position = position_dodge(0.80), alpha=0.5) +
+  geom_dotplot(binaxis = "y", stackdir = "center", dotsize = 0.50, position = position_dodge(0.8), binwidth = 0.19) + 
+  scale_y_continuous(name = "Average Immersion Score", lim = c(0, 4.5), breaks = seq(0, 4.5, 1)) + 
+  facet_grid(.~Condition, scales = "free", labeller = labeller(Condition = SF_cat)) + 
+  scale_x_discrete(name = "Gender",labels = Gender_cat) + 
+  labs(title="Average Total Immersion scores across Sensory Feedback") + theme_minimal()  + 
+  theme(plot.title = element_text(face =  "bold", size = 14, hjust = 0.5), axis.title.x = element_text(face = "bold", vjust = 0.5), 
+        axis.title.y = element_text(face = "bold", hjust = 0.5),
+        axis.text = element_text(colour = "black"), legend.position = "none") +
+  scale_color_manual(aesthetics = c("colour", "fill"), labels = SF_cat, values = SF_cols) +
+  ggsave("avg_immersion_byGender_facetSF.png", plot = last_plot(), device = NULL, path = NULL, scale = 1,width = NA, height = NA,
+  dpi = 300,limitsize = TRUE)
+
+# Average Immersion Faceted Across Gender :
+
+Gender_cat <- c("0" = "Female", "1" = "Male")
+SF_cat <- c("1" = "Minus", "2" = "Neutral", "3" = "Plus")
+Gender_cols <- c("0" = "Blue", "1" = "DarkGreen")
+
+ggplot(data = SF_final, aes(x=Condition, y=avg_immersion, colour = Gender, fill = Gender)) + 
+  geom_boxplot(stat = "boxplot", width = 0.5, position = position_dodge(0.80), alpha=0.4) +
+  geom_dotplot(binaxis = "y", stackdir = "center", dotsize = 0.50, position = position_dodge(0.8), binwidth = 0.19) + 
+  scale_y_continuous(name = "Average Immersion Score", lim = c(0, 4.5), breaks = seq(0, 4.5, 1)) + 
+  scale_x_discrete(name = "Sensory Feedback",labels = SF_cat) + 
+  labs(title="Average Total Immersion Scores across Sensory Feedback") + 
+  facet_grid(.~Gender, scales = "free", labeller = labeller(Gender = Gender_cat)) + theme_minimal()  + 
+  theme(plot.title = element_text(face =  "bold", size = 14, hjust = 0.5), axis.title.x = element_text(face = "bold", vjust = 0.5), 
+        axis.title.y = element_text(face = "bold", hjust = 0.5),
+        axis.text = element_text(colour = "black"), legend.position = "none") +
+  scale_color_manual(name="Gender", aesthetics = c("colour", "fill"), labels = Gender_cat, values = Gender_cols) +
+  ggsave("avg_immersion_bySF_facetGender.png", plot = last_plot(), device = NULL, path = NULL, scale = 1,width = NA, height = NA,
+  dpi = 300,limitsize = TRUE)
+
+```
+
+
+# Data Visualization of Predictors:
+```{r}
+# Depression, ASRS part A & Affect Scores Collapsed Across SF by Gender
+
+Gender_cat <- c("0" = "Female", "1" = "Male")
+SF_cat <- c("1" = "Minus", "2" = "Neutral", "3" = "Plus")
+Gender_cols <- c("0" = "Blue", "1" = "DarkGreen")
+SF_cols <- c("1" = "darkcyan", "2" = "Purple", "3" = "Red")
+
+ggplot(data = SF_final, aes(x=Gender, y=Depression_Total, colour = Gender, fill = Gender)) + 
+  geom_boxplot(stat = "boxplot", width = 0.50, position = position_dodge(0.80), alpha=0.50) +
+  geom_dotplot(binaxis = "y", stackdir = "center", dotsize = 0.75, position = position_dodge(0.8), binwidth = 1) + 
+  scale_y_continuous(name = "Total Depression Score", lim = c(0, 50), breaks = seq(0, 50, 10)) + 
+  scale_x_discrete(name = "Gender",labels = Gender_cat) + 
+  labs(title="Total Depression Score on the DASS") + theme_minimal()  + 
+  theme(plot.title = element_text(face =  "bold", size = 14, hjust = 0.5), axis.title.x = element_text(face = "bold", vjust = 0.5), 
+        axis.title.y = element_text(face = "bold", hjust = 0.5),
+        axis.text = element_text(colour = "black", size = 10), legend.position = "none") +
+  scale_color_manual(aesthetics = c("colour", "fill"), labels = Gender_cat, values = Gender_cols) +
+  ggsave("total_depression.png", plot = last_plot(), device = NULL, path = NULL, scale = 1,width = NA, height = NA,
+  dpi = 300,
+  limitsize = TRUE)
+
+
+Gender_cat <- c("0" = "Female", "1" = "Male")
+SF_cat <- c("1" = "Minus", "2" = "Neutral", "3" = "Plus")
+Gender_cols <- c("0" = "Blue", "1" = "DarkGreen")
+SF_cols <- c("1" = "darkcyan", "2" = "Purple", "3" = "Red")
+
+ggplot(data = SF_final, aes(x=Gender, y=ASRS_partA, colour = Gender, fill = Gender)) + 
+  geom_boxplot(stat = "boxplot", width = 0.50, position = position_dodge(0.80), alpha=0.50) +
+  geom_dotplot(binaxis = "y", stackdir = "center", dotsize = 0.25, position = position_dodge(0.8), binwidth = 0.50) + 
+  scale_y_continuous(name = "Total ASRS Part A Score", lim = c(0, 6), breaks = seq(0, 6, 3)) + 
+  scale_x_discrete(name = "Gender",labels = Gender_cat) + 
+  labs(title="Total Score on part A of the ASRS") + theme_minimal()  + 
+  theme(plot.title = element_text(face =  "bold", size = 12, hjust = 0.5), axis.title.x = element_text(face = "bold", vjust = 0.5), 
+        axis.title.y = element_text(face = "bold", hjust = 0.5),
+        axis.text = element_text(colour = "black", size = 10), legend.position = "none") +
+  scale_color_manual(aesthetics = c("colour", "fill"), labels = SF_cat, values = Gender_cols) +
+  ggsave("total_ASRSpartA.png", plot = last_plot(), device = NULL, path = NULL, scale = 1,width = NA, height = NA,
+  dpi = 300,
+  limitsize = TRUE)
+
+
+ggplot(data = SF_final, aes(x=Gender, y=PANAS_negAffect, colour = Gender, fill = Gender)) + 
+  geom_boxplot(stat = "boxplot", width = 0.50, position = position_dodge(0.80), alpha=0.50) +
+  geom_dotplot(binaxis = "y", stackdir = "center", dotsize = 0.75, position = position_dodge(0.8), binwidth = 0.40) + 
+  scale_y_continuous(name = "Total Negative Affect Score", lim = c(0, 20), breaks = seq(0, 20, 5)) + 
+  scale_x_discrete(name = "Gender",labels = Gender_cat) + 
+  labs(title="Total Negative Affect Score on the PANAS") + theme_minimal()  + 
+  theme(plot.title = element_text(face =  "bold", size = 12, hjust = 0.5), axis.title.x = element_text(face = "bold", vjust = 0.5), 
+        axis.title.y = element_text(face = "bold", hjust = 0.5),
+        axis.text = element_text(colour = "black", size = 10), legend.position = "none") +
+  scale_color_manual(aesthetics = c("colour", "fill"), labels = SF_cat, values = Gender_cols) +
+  ggsave("negAffect.png", plot = last_plot(), device = NULL, path = NULL, scale = 1,width = NA, height = NA,
+  dpi = 300,
+  limitsize = TRUE)
+
+
+ggplot(data = SF_final, aes(x=Gender, y=PANAS_posAffect, colour = Gender, fill = Gender)) + 
+  geom_boxplot(stat = "boxplot", width = 0.50, position = position_dodge(0.80), alpha=0.50) +
+  geom_dotplot(binaxis = "y", stackdir = "center", dotsize = 0.750, position = position_dodge(0.8), binwidth = 0.50) + 
+  scale_y_continuous(name = "Total Positive Affect Score", lim = c(0, 30), breaks = seq(0, 30, 5)) + 
+  scale_x_discrete(name = "Gender",labels = Gender_cat) + 
+  labs(title="Total Postive Affect Score on the PANAS") + theme_minimal()  + 
+  theme(plot.title = element_text(face =  "bold", size = 12, hjust = 0.5), axis.title.x = element_text(face = "bold", vjust = 0.5), 
+        axis.title.y = element_text(face = "bold", hjust = 0.5),
+        axis.text = element_text(colour = "black", size = 10), legend.position = "none") +
+  scale_color_manual(aesthetics = c("colour", "fill"), labels = SF_cat, values = Gender_cols) +
+  ggsave("posAffect.png", plot = last_plot(), device = NULL, path = NULL, scale = 1,width = NA, height = NA,
+  dpi = 300,
+  limitsize = TRUE)
+
+```
+
+
+# Model One: 
+  - Condition as Dimension
+  - Predictors: Condition, Gender, Sequence, Depression Total
+  - Gamma Correction
+```{r}
+summary(powerTransform(model_immersion1, family = "bcnPower", itmax = 1))
+
+model_immersion1 = glm(avg_immersion ~ Condition * Gender + Sequence + Depression_Total, data = SF_final, family = Gamma(link = "log")) 
+summary(model_immersion1)
+coef(model_immersion1)
+
+ci1 <- confint(model_immersion1, level = 0.95)
+ctab1 <- cbind(est=coef(model_immersion1),ci1)
+rtab1 <- exp(ctab1)
+print(rtab1,digits=3)
+
+# Assumptions Met: Linearity, Normality, Homoscedasticity & Independence (of residuals)
+
+par(mfrow=c(2,2))
+plot(model_immersion1)
+
+shapiro.test(resid(model_immersion1))
+ncvTest(lm(avg_immersion ~ Condition * Gender + Sequence + Depression_Total, data = SF_final))
+
+durbinWatsonTest(model_immersion1)
+
+vif(model_immersion1)
+sqrt(vif(model_immersion1)) > 2
+outlierTest(model_immersion1)
+influencePlot(model_immersion1,id.method = "idendify") # check later how to delete observations!
+
+
+# Residual Deviance Test
+1-pchisq(16.051/0.1052462,146)
+
+# Looking at Residuals 
+p = residuals(model_immersion1, type = "deviance") # residuals
+sum(p^2)
+predict(model_immersion1, type="response") # predicted values
+
+
+
+# Plot
+
+scatterplot(avg_immersion ~ Depression_Total | Condition, data = SF_final, regLine = list(method=glm),  
+            xlab="Total Depression Score", ylab="Average Total Immersion Score") 
+
+scatterplot(avg_immersion ~ Depression_Total, data = SF_final, regLine = list(method=glm),  
+            xlab="Total Depression Score", ylab="Average Total Immersion Score", col= "black") 
+  
+
+```
+
+
+# Model Two
+  - Condition as Factor
+  - Predictors: Condition, Gender, Sequence, Depression Total, ASRS part A
+  - Gamma Correction
+```{r}
+summary(powerTransform(model_immersion2, family = "bcnPower", itmax = 1))
+
+model_immersion2 = glm(avg_immersion ~ Condition * Gender + Sequence + Depression_Total + ASRS_partA, data = SF_final, family = Gamma(link = "log"))
+summary(model_immersion2)
+
+ci2 <- confint(model_immersion2, level = 0.95)
+ctab2 <- cbind(est=coef(model_immersion2),ci2)
+rtab2 <- exp(ctab2)
+print(rtab2,digits=3)
+
+# Assumptions Met: Linearity, Normality, Homoscedasticity & Independence (of residuals)
+
+par(mfrow=c(2,2))
+plot(model_immersion2)
+
+shapiro.test(resid(model_immersion2))
+ncvTest(lm(avg_immersion ~ Condition * Gender + Sequence + Depression_Total + ASRS_partA, data = SF_final))
+
+durbinWatsonTest(model_immersion2)
+
+
+vif(model_immersion2)
+sqrt(vif(model_immersion2)) > 2
+outlierTest(model_immersion2)
+influencePlot(model_immersion2,id.method = "idendify")
+
+
+# Residual Deviance Test
+1-pchisq(16.051/0.1059721,145)
+
+# Looking at Residuals 
+p1 = residuals(model_immersion2, type = "deviance") # residuals
+sum(p1^2)
+
+predict(model_immersion2, type="response") # predicted values
+
+```
+
+# Model Four:
+```{r}
+model_immersion4 = glm(avg_immersion ~ Condition * Gender + Sequence, data = SF_final, family = Gamma(link = "log"))
+summary(model_immersion4)
+
+# Assumptions Met: Linearity, Normality, Homoscedasticity & Independence (of residuals)
+
+par(mfrow=c(2,2))
+plot(model_immersion4)
+
+shapiro.test(resid(model_immersion4))
+ncvTest(lm(avg_immersion ~ Condition * Gender + Sequence + Depression_Total, data = SF_final))
+
+durbinWatsonTest(model_immersion4)
+
+
+vif(model_immersion4)
+sqrt(vif(model_immersion4)) > 2
+outlierTest(model_immersion2)
+influencePlot(model_immersion2,id.method = "idendify")
+```
+
+
+# Transforming Variables:
+```{r}
+# Mean Immersion Score <- Outcome Variables
+
+summary(powerTransform(SF_final$avg_immersion, family = "bcPower"))
+
+SF_final$avg_lnimmersion <- log(SF_final$avg_immersion)
+
+I <- SF_final$avg_lnimmersion
+
+shapiro.test(I)
+
+histI <- hist(I, main = "Immersion", breaks = 20, xlab = "Average Immersion Score",  col = "orange")
+xfit <- seq(min(I), max(I), length = 40) 
+yfit <- dnorm(xfit, mean = mean(I), sd = sd(I)) 
+yfit <- yfit * diff(histI$mids[2:3]) * length(I) 
+lines(xfit, yfit, col = "black", lwd = 2)
+
+# Predictors
+
+summary(powerTransform(SF_final$Depression_Total, family = "bcPower"))
+
+SF_final$Dep_Inverse <- 1/(SF_final$Depression_Total)
+
+D <- SF_final$Dep_Inverse
+
+shapiro.test(D)
+
+histD <- hist(D, main = "Depression", xlab = "Total Depression Score",  col = "orange")
+xfitD <- seq(min(D), max(D), length = 40) 
+yfitD <- dnorm(xfitD, mean = mean(D), sd = sd(D)) 
+yfitD <- yfitD * diff(histD$mids[2:3]) * length(D) 
+lines(xfitD, yfitD, col = "black", lwd = 2)
+
+```
+
+
+# Model Three
+  - Condition as Factor
+  - Transformed Variables
+```{r}
+summary(powerTransform(model_immersion3, family = "bcnPower", itmax = 1))
+
+model_immersion3 = glm(avg_lnimmersion ~ Condition * Gender + Sequence + Dep_Inverse, data = SF_final)
+summary(model_immersion3)
+
+
+# Assumptions Met: Linearity, Normality, Homoscedasticity & Independence (of residuals)
+
+par(mfrow=c(2,2))
+plot(model_immersion3)
+
+shapiro.test(resid(model_immersion3))
+ncvTest(lm(avg_lnimmersion ~ Condition * Gender + Sequence + Dep_Inverse, data = SF_final))
+
+durbinWatsonTest(model_immersion3)
+
+
+vif(model_immersion3)
+sqrt(vif(model_immersion3)) > 2
+outlierTest(model_immersion3)
+influencePlot(model_immersion3,id.method = "idendify")
+
+# Plot
+
+#scatterplot(avg_lnimmersion ~ Depression_Total | Condition, data = SF_final, regLine = list(method=glm),  
+            #xlab="Total Depression Score", ylab="Average Total Immersion Score") # Think about this
+```
+
+# Model Five
+  - Condition as Factor
+  - Predictors: Condition, Sequence
+  - Gamma Correction
+  
+```{r}
+model_immersion5 = glm(avg_immersion ~ Condition + Sequence, data = SF_final, family = Gamma(link = "log"))
+summary(model_immersion5)
+
+# Assumptions Met: Linearity, Normality, Homoscedasticity & Independence (of residuals)
+
+par(mfrow=c(2,2))
+plot(model_immersion5)
+
+shapiro.test(resid(model_immersion5)) # non-normal data
+ncvTest(lm(avg_lnimmersion ~ Condition + Sequence + Condition * Sequence, data = SF_final))
+
+durbinWatsonTest(model_immersion5)
+
+
+vif(model_immersion5)
+sqrt(vif(model_immersion5)) > 2
+outlierTest(model_immersion5)
+influencePlot(model_immersion5,id.method = "identify")
+
+# NOTES: 
+
+# Based on residuals versus fited plot, the mean of the residuals is not around 0 (i.e. non-linear) and do not have a constant variance (i.e. its heteroskedastic)
+
+ci2 <- confint(model_immersion2, level = 0.95)
+ctab2 <- cbind(est=coef(model_immersion5),ci2)
+rtab2 <- exp(ctab2)
+print(rtab2,digits=3)
+```
+
+
+# Model Validity & Comparison
+```{r}
+AIC(model_immersion3, model_immersion1)
+AIC(model_immersion4, model_immersion1)
+
+
+anova(model_immersion1, test = "Chisq")
+anova(model_immersion2, test = "Chisq")
+anova(model_immersion3, test= "Chisq")
+anova(model_immersion4, test= "Chisq")
+
+```
+
+
+# Post-hoc testing
+```{r}
+SF_plus$avg_lnimmersion <- log(SF_plus$avg_immersion)
+
+bartlett.test(avg_lnimmersion ~ Gender, SF_plus)
+posthoc = glm(avg_immersion ~ Gender, SF_plus, family = Gamma(link = "log"))
+summary(posthoc)
+```
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+#plot(cars)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
